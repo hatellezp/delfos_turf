@@ -1,0 +1,8 @@
+# compilations
+*.pyc
+
+# stupid file
+info_modificators.py
+
+__pycache
+venv
