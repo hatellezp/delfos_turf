@@ -77,6 +77,7 @@ class TurfConnect:
         #######################################################################
 
         #######################################################################
+        print("="*100)
         print(("Attempt to connect to database with parameters:\n    "
                "-host={}\n    -user={}\n    -passwd={}\n    -database={}").
               format(self.host, self.user, self.passwd, self.database))
@@ -93,7 +94,7 @@ class TurfConnect:
             print("Error while conncting to database")
 
         print("Connection made.\n")
-
+        print("="*100)
         self.db = mydb
         self.cursor = mydb.cursor(dictionary=True)  # dictionnary is the good
                                                     # way
@@ -107,19 +108,37 @@ class TurfConnect:
         The dummy horses are not complete. They have fields missing.
         Those fields are updated when some race has to be completed.
         """
+
+        print("="*100)
         print("Creating dummy horses...")
         # the connection has been made, we make the dummy horses here
         list_dummy_horses = []
         list_dummy_horse_names = []
+        list_dummy_horse_jockey = []
+        list_dummy_horse_entraineur = []
+        list_dummy_horse_proprietaire = []
         for i in range(40):
             name = 'dummy' + str(i)
             dummy = TurfConnect.create_dummy_horse(name)
 
             list_dummy_horses.append(dummy)
+
+            # horse names
             list_dummy_horse_names.append(name)
 
+            # dummy jockey names
+            list_dummy_horse_jockey.append(dummy['jockey'])
+            list_dummy_horse_jockey.append(dummy['dernierJoc'])
+
+            list_dummy_horse_entraineur.append(dummy['entraineur'])
+            list_dummy_horse_entraineur.append(dummy['dernierEnt'])
+
+            list_dummy_horse_proprietaire.append(dummy['proprietaire'])
+            list_dummy_horse_proprietaire.append(dummy['dernierProp'])
+
         self.dummy_horses = list_dummy_horses
-        print("Done. {} dummy horses created.\n".format(self.normal))
+        print("Done. {} dummy horses created.\n".format(len(self.dummy_horses)))
+        print("="*100)
         #######################################################################
 
         #######################################################################
@@ -127,7 +146,7 @@ class TurfConnect:
         This part is the list of global information that need to be maped to
         some constant and simpler values.
         """
-
+        print("="*100)
         print("Getting list of race types...")
         # this form take the information directly from the database
         self.type_course = self.make_list_arg('typec')
@@ -154,9 +173,59 @@ class TurfConnect:
 
         print("Getting list of hippodromes...")
         self.hippo = self.make_list_arg('hippo')
-        # print(self.chevaux)
+        self.hippo.append("dummy_hippo")
+        # print(self.hippo)
         print("Done.\n")
 
+        print("Getting list of ecuries...")
+        # ecurie + dummyecu + bijection
+        self.ecuries = self.make_list_arg('ecurie')
+        self.chevaux.append("dummy_ecurie")
+        print("Done.\n")
+
+        print("Getting list of jockey names...")
+        # jockey + dernierJoc + dummyjoc + bijection
+        dernierJocs = self.make_list_arg('dernierJoc')
+        self.jockeys = self.make_list_arg('jockey')
+        self.jockeys.extend(dernierJocs)
+        self.jockeys.extend(list_dummy_horse_jockey)
+        print("Done.\n")
+
+        print("Getting list of trainer names...")
+        # entraineur + dernierEnt + dummyent + bijection
+        dernierEnts = self.make_list_arg('dernierEnt')
+        self.trainers = self.make_list_arg('entraineur')
+        self.trainers.extend(dernierEnts)
+        self.trainers.extend(list_dummy_horse_entraineur)
+        print("Done.\n")
+
+        print("Getting list of owner names...")
+        # proprietaire + dernierProp + dummyprop + bijection
+        dernierProps = self.make_list_arg('dernierProp')
+        self.owners = self.make_list_arg('proprietaire')
+        self.owners.extend(dernierProps)
+        self.owners.extend(list_dummy_horse_proprietaire)
+        print("Done.\n")
+        print("="*100)
+
+        print("="*100)
+        print("Creating bijections...")
+        self.hippo_bijection = TurfConnect.create_bijcetion(self.hippo)
+        print("    hippodromes")
+        self.chevaux_bijection = TurfConnect.create_bijcetion(self.chevaux)
+        print("    horses")
+        self.ecuries_bijection = TurfConnect.create_bijcetion(self.ecuries)
+        print("    ecuries")
+        self.jockeys_bijection = TurfConnect.create_bijcetion(self.jockeys)
+        print("    jockeys")
+        self.trainers_bijection = TurfConnect.create_bijcetion(self.trainers)
+        print("    trainers")
+        self.owners = TurfConnect.create_bijcetion(self.owners)
+        print("    owners")
+        print("Done.\n")
+        print("="*100)
+
+        print("="*100)
         print("Initialization done.")
         #######################################################################
 
@@ -164,6 +233,7 @@ class TurfConnect:
         # stupid test to see if the database can answer the simplest query
         if self.test():
             print("Dummy test passed.")
+        print("="*100)
 
     # dummy function to test the connection with the database
     def test(self):
@@ -433,7 +503,8 @@ class TurfConnect:
         dummy['dernierecote'] = '0'
         dummy['dernierJoc'] = name + '_jockey'
         dummy['dernierEnt'] = name + '_entraineur'
-        dummy['dernierProp'] = name + '_propietaire'
+        dummy['dernierProp'] = name + '_proprietaire'
+        dummy['proprietaire'] = name + '_proprietaire'
         dummy['nbcoursepropjour'] = 0
         dummy['europ'] = ''
         dummy['amat'] = ''
