@@ -17,7 +17,7 @@ for k in ks:
 
 ncourse = '2289455145'
 
-daddres = "/home/horacio/Documents/turf/csv_files"
+daddres = "/home/horacio/Documents/turf/delfos_turf/csv_files"
 fname = "test"
 
 hs_columns = ['cheval', 'age', 'sexe', 'jockey']
