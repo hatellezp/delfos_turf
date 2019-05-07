@@ -1,9 +1,0 @@
-- Number of horses by race: 40
-- First date: 2014-01-01
-- Last date: 2019-03-23
-- Race type: Plat
-- Attributes by horse: 4
-    - ['cheval', 'age', 'sexe', 'jockey']
-- Attributes by race: 4
-    - ['jour', 'hippo', 'dist', 'partant']
-- File created: 2019-05-07 15:35:17.948597
