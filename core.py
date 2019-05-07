@@ -2,8 +2,13 @@
 
 import mysql.connector
 import datetime
-import copy
 import csv
+
+import helper
+
+# TODO: working around line 438, the function that is supposed to write to
+#       csv file can't, maybe read the DictReader class of the csv package.
+# TODO: change bijection to dictionnary or hash table, performance!
 
 ##############################################################################
 ##############################################################################
@@ -14,7 +19,7 @@ needed files to machine learning.
 
 # Obs : the string that the database returns are unicode, take that in account.
 # UPDATE: In python3, we can drop the unicode problems
-# COLUMNS has 129 elemtents
+# COLUMNS has 129 elements
 COLUMNS = ['id', 'comp', 'jour', 'hippo', 'numcourse', 'cl', 'dist', 'partant',
            'typec', 'cheque', 'numero', 'cheval', 'sexe', 'age', 'cotedirect',
            'coteprob', 'recence', 'ecurie', 'distpoids', 'ecar', 'redkm',
@@ -52,10 +57,9 @@ COLUMNS = ['id', 'comp', 'jour', 'hippo', 'numcourse', 'cl', 'dist', 'partant',
 ##############################################################################
 
 
-
 class TurfConnect:
     """
-    This class should contains almost everythin present in this file.
+    This class should contains almost everything present in this file.
     """
 
     def __init__(self):
@@ -96,14 +100,14 @@ class TurfConnect:
         print("Connection made.\n")
         print("="*100)
         self.db = mydb
-        self.cursor = mydb.cursor(dictionary=True)  # dictionnary is the good
+        self.cursor = mydb.cursor(dictionary=True)  # dictionary is the good
                                                     # way
         #######################################################################
 
         #######################################################################
         """
         This idea of making all races the same size is being tested.
-        I'm not sure how to manage inconsisten size data.
+        I'm not sure how to manage inconsistent size data.
 
         The dummy horses are not complete. They have fields missing.
         Those fields are updated when some race has to be completed.
@@ -210,20 +214,26 @@ class TurfConnect:
 
         print("="*100)
         print("Creating bijections...")
-        self.hippo_bijection = TurfConnect.create_bijcetion(self.hippo)
+        self.hippo_bijection = TurfConnect.create_bijection(self.hippo)
         print("    hippodromes")
-        self.chevaux_bijection = TurfConnect.create_bijcetion(self.chevaux)
+        self.chevaux_bijection = TurfConnect.create_bijection(self.chevaux)
         print("    horses")
-        self.ecuries_bijection = TurfConnect.create_bijcetion(self.ecuries)
+        self.ecuries_bijection = TurfConnect.create_bijection(self.ecuries)
         print("    ecuries")
-        self.jockeys_bijection = TurfConnect.create_bijcetion(self.jockeys)
+        self.jockeys_bijection = TurfConnect.create_bijection(self.jockeys)
         print("    jockeys")
-        self.trainers_bijection = TurfConnect.create_bijcetion(self.trainers)
+        self.trainers_bijection = TurfConnect.create_bijection(self.trainers)
         print("    trainers")
-        self.owners = TurfConnect.create_bijcetion(self.owners)
+        self.owners_bijection = TurfConnect.create_bijection(self.owners)
         print("    owners")
         print("Done.\n")
         print("="*100)
+
+        self.available_bijections = ["hippo", "cheval", "pere", "mere",
+                                     "ecurie", "dernierJoc", "jockey",
+                                     "dernierEnt", "entraineur",
+                                     "dernierProp", "proprietaire",
+                                    ]
 
         print("="*100)
         print("Initialization done.")
@@ -283,6 +293,12 @@ class TurfConnect:
         if self.is_valid_course(ncourse):
             res = self.get_specific_course(ncourse)[0]
             return res['typec']
+
+    def get_date_of_course_from_numcourse(self, ncourse):
+         if self.is_valid_course(ncourse):
+            res = self.get_specific_course(ncourse)[0]
+            return res['jour']
+
     ############################################################################
 
     ###########################################################################
@@ -291,7 +307,7 @@ class TurfConnect:
     # For columns like 'cheval', 'typec'... this wrap all types in a list
     # and returns it.
     def make_list_arg(self, column):
-        l = [] # list to return
+        lis = []  # list to return
 
         # query definition and execution
         query = "SELECT {} FROM cachedate GROUP BY {}".format(column, column)
@@ -299,8 +315,8 @@ class TurfConnect:
 
         # appending resutls
         for r in res:
-            l.append(r[column])
-        return l
+            lis.append(r[column])
+        return lis
 
     # This returns all columns that exist in the database excluding those in
     # 'ex_columns'.
@@ -332,14 +348,15 @@ class TurfConnect:
 
     # A pretty print function to present the 'cursor' answer that is a
     # dictionary.
-    def present_dict_answer(self, list_dd):
+    @staticmethod
+    def present_dict_answer(list_dd):
         res = ""
         for dd in list_dd:
             i = 0
             for key in dd.keys():
                 value = dd[key]
                 # we need to be careful with the encoding of strings...
-                if isinstance(value, str) or isinstance(value, unicode):
+                if isinstance(value, str): # rememvber to use pyhton3!!!!
                     value = value.encode('utf-8')
                 aa = "{}- {}: {},\n".format(str(i), key, value)
                 res += aa
@@ -366,7 +383,6 @@ class TurfConnect:
             course_type = list_dict[0]['typec']
 
             # base dummy horse
-            base_name = "dummy"
             base_position = length + 1
             base_corde_position = length + 1
 
@@ -387,40 +403,225 @@ class TurfConnect:
         else:
             print("ERROR: INVALID COURSE!!")
 
+    # use now the bijection to map everything to numbers
+    def from_course_make_vector_couple(self, numcourse, hs_columns, gb_columns):
 
-    # this is one of the most importtant function, it will build two vectors for
-    # learning from a course
-    # there is 'raw' at the end, this must be treated before computing of
-    # storing in csv
-    # this function is wrong, plainly wrong, a lot of duplicate information
-    def from_course_make_vector_couple(self, course_type, numcourse):
-        q = "SELECT typec FROM cachedate WHERE numcourse='{}'".\
-            format(numcourse)
-        res = self.pass_query(q)
-        if len(res) > 0 and res[0]['typec'] == course_type:
-            hippo_bijection = TurfConnect.create_bijcetion(self.hippo)
-            cheval_bijection = TurfConnect.create_bijcetion(self.chevaux)
-            pass
+        course_list_dict = self.complete_course(
+            ncourse=numcourse) # is this the correct method ?
+
+        # this part of the information is global for all horses in the race
+        # now we join each horse in a vector and another vector for the results
+
+        # extends both rows with a last position, a target.
+        # for the moment make a list to keep the positions
+        target = []
+
+        # this is the first row of the csv file, we will always return the
+        # first row for every race, even if it is only needed only once,
+        # maybe after optimize the memory used
+        tail = self.make_tail_of_vector(hs_columns)
+        first_row = gb_columns.copy()
+        first_row.extend(tail)
+
+        # target appended
+        first_row.append("target")
+
+        # this one is the one with the information about the horses
+        second_row = []
+
+        # we need to put the global information also in the second row
+        first_horse = course_list_dict[0]
+        for gbc in gb_columns:
+            value = self.transform_value_by_column(gbc,
+                                                   first_horse[gbc],
+                                                   False)
+            if value != -1:
+                second_row.append(value)
+            else:
+                second_row.append(' ')
+
+        for horse in course_list_dict:
+            # append position of the horse to the vector target
+            target.append(horse["cl"])
+            for column in hs_columns:
+                # the transformation to numeric values is done here
+                value = self.\
+                    transform_value_by_column(column, horse[column], False)
+                if value != -1:
+                    second_row.append(value)
+                else:
+                    second_row.append(' ')
+
+        # target appended
+        target = TurfConnect.target_position_to_truly_number_vector(target)
+        target = tuple(target)
+
+        # testing second line here
+        # second_row.append(str(target))
+        second_row.append(target)
+
+        # I don't think this is needed anymore
+        """
+        return TurfConnect.list_to_full_string(first_row), \
+               TurfConnect.list_to_full_string(second_row)
+        """
+        return first_row, second_row
+
+    # this function is under test
+    def write_course_to_csv(self, numcourse, dir_address, file_name,
+                            hs_columns, gb_columns):
+        first_row, second_row = self.\
+            from_course_make_vector_couple(numcourse, hs_columns, gb_columns)
+
+        try:
+            ff = open(dir_address + "/" + file_name + ".csv", 'w+',
+                      encoding='utf-8')
+            csv_writer = csv.writer(ff)
+            # print(len(first_row))
+            # print(len(second_row))
+
+            # print(first_row)
+            # print(second_row)
+
+            """
+            for i in first_row:
+                print(i, type(i))
+            print("="*100)
+            for i in second_row:
+                print(i, type(i))
+            print("="*100)
+            """
+
+            csv_writer.writerow(first_row)
+            csv_writer.writerow(second_row)
+        except Exception as e:
+            print("COULDN'T WRITE TO FILE : {}".format(e))
+
+    # all method should implement a way to make a sibling file to record
+    # information to identify each csv file with the information that it takes:
+    # - first date -> last date
+    # - type(s) of course
+    # - attributes used in the csv file
+    def write_course_to_csv_all_by_type(self, dir_address, file_name, typec,
+                                        hs_columns, gb_columns):
+
+        if not (typec in self.type_course):
+            raise Exception("UNKNOWN TYPE OF COURSE: ABORTING")
+        else:
+            # I need the first row only once
+            first_row, second_row = self.\
+                from_course_make_vector_couple(self.courses[0], hs_columns, gb_columns)
+            rows = []
+
+            counter = 0
+            length = len(self.courses)
+
+            first_date = datetime.date(2100, 1, 1)
+            last_date = datetime.date(1900, 1, 1)
+
+            instances = 0
+
+            for course in self.courses:
+                # test that the race is of the good type
+                if self.get_type_of_course_from_numcourse(course) == typec:
+                    instances += 1
+
+                    this_date = self.get_date_of_course_from_numcourse(course)
+                    if this_date < first_date:
+                        first_date = this_date
+                    if this_date > last_date:
+                        last_date = this_date
+
+                    not_needed_row, row = self.\
+                    from_course_make_vector_couple(course, hs_columns, gb_columns)
+                    rows.append(row)
+                    print("-"*100)
+                    remaining = length - counter
+                    print(remaining, "races remaining")
+                    counter += 1
+
+            try:
+
+                dump_name = open(dir_address + "/" + "dump_counter", 'r')
+                dump_counter = int(dump_name.readline().strip())
+                dump_name.close()
+                dump_name = open(dir_address + "/" + "dump_counter", 'w')
+                dump_name.write(str(dump_counter+1))
+                dump_name.close()
+                dump_name = "dump-" + str(dump_counter)
 
 
-    # this function create bijection betweeen a list of something and numbers
-    # usually we will us it to map not numeric values to numveric ones
+                ff = open(dir_address + "/" + dump_name + ".csv", 'w+',
+                          encoding='utf-8')
+
+                # this is the descriptor file
+                fdescrip = open(dir_address + "/" + dump_name + "_descrp", 'w+',
+                                encoding='utf-8')
+
+                first_date = str(first_date)
+                last_date = str(last_date)
+                file_date = str(datetime.datetime.now())
+
+                fdescrip_str = (("- Number of horses by race: %d\n"
+                                 "Instaces: %d\n"
+                                 "Total attributes: %d\n"
+                                 "- First date: %s\n- Last date: %s\n"
+                                 "- Race type: %s\n"
+                                 "- Attributes by horse: %d\n"
+                                 "    - %s\n"
+                                 "- Attributes by race: %d\n"
+                                 "    - %s\n"
+                                 "- File created: %s")
+                 % (self.normal, instances, len(first_row), last_date, typec,
+                    len(hs_columns),
+                    str(hs_columns), len(gb_columns), str(gb_columns),
+                    file_date)
+                )
+
+                fdescrip.write(fdescrip_str)
+
+                # csv-file write-to part
+                csv_writer = csv.writer(ff)
+
+                csv_writer.writerow(first_row)
+                for row in rows:
+                    csv_writer.writerow(row)
+            except Exception as e:
+                print("COULDN'T WRITE TO FILE : {}".format(e))
+
+    # this function create bijection between a list of something and numbers
+    # usually we will us it to map not numeric values to numeric ones
     @staticmethod
-    def create_bijcetion(lis):
+    def create_bijection(lis):
         length = len(lis)
+        bij_dict = helper.TWDict()
+        for i in range(length):
+            bij_dict[lis[i]] = i
+
+        def f2(value, inverse=False):
+            return bij_dict.get(value)
+
+        """
         def f(value, inverse=False):
             li = lis.copy()
+
             if not inverse:
                 for i in range(length):
-                    if value==li[i]:
+                    print("comparing", value, " and ", li[i])
+                    if value == li[i]:
+                        print("value found")
                         return i
+                print("value not found")
                 return -1
             else:
                 for i in li:
                     if i == li[value]:
                         return i
                 return "EMPTY"
-        return f
+        """
+
+        # return f
+        return f2
 
     # this has to be done manually, awesome ! I really hope all this work pays
     # the horses has to be created before each race, I'm going to make a NORMAL
@@ -595,4 +796,68 @@ class TurfConnect:
 
         return dummy
 
+    def make_tail_of_vector(self, columns):
+        tail = []
+
+        for i in range(self.normal):
+            for column in columns:
+                tail.append(column + str(i))
+
+        return tail
+
+    @staticmethod
+    def list_to_full_string(li):
+        res_li = []
+
+        for i in li:
+            res_li.append(str(i))
+
+        return res_li
+
+    # this will take a list a transform to a vector, we don't need
+    # to further transform to a vector, maybe only to string
+    @staticmethod
+    def target_position_to_truly_number_vector(li):
+        lis = []
+        for i in li:
+            str_i = str(i)
+            if (str_i[:2]).isdigit():
+                lis.append(int(str_i[:2]))
+            elif (str_i[:1]).isdigit():
+                lis.append(int(str_i[:1]))
+            else:
+                # another solution
+                # lis.append(-1)
+                lis.append(41)
+        return tuple(lis)
+
+    def transform_value_by_column(self, column, value, inverse=False):
+        """
+        [
+            "hippo", "cheval", "pere", "mere", "ecurie", "dernierJoc", "jockey",
+            "dernierEnt", "entraineur", "dernierProp", "proprietaire",
+        ]
+        :param column: a columns that is in the bijections set
+        :param inverse: the way the mapping goes
+        :param value: value to e transformed
+        :return: a value
+        """
+        if column in ["age", "sexe", "jour", "numcourse", "dist", "partant",
+                      "typec"]:
+            return value
+        elif not (column in self.available_bijections):
+            raise Exception("NOT AVAILABLE BIJECTION FOR THIS COLUMN")
+        else:
+            if column in ["hippo"]:
+                return self.hippo_bijection(value, inverse)
+            elif column in ["cheval", "pere", "mere"]:
+                return self.chevaux_bijection(value, inverse)
+            elif column in ["ecurie"]:
+                return self.ecuries_bijection(value, inverse)
+            elif column in ["dernierJoc", "jockey"]:
+                return self.jockeys_bijection(value, inverse)
+            elif column in ["dernierEnt", "entraineur"]:
+                return self.trainers_bijection(value, inverse)
+            elif column in ["dernierProp", "proprietaire"]:
+                return self.owners_bijection(value, inverse)
 
