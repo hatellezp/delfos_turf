@@ -502,15 +502,29 @@ class TurfConnect:
     # - first date -> last date
     # - type(s) of course
     # - attributes used in the csv file
-    def write_course_to_csv_all_by_type(self, dir_address, file_name, typec,
-                                        hs_columns, gb_columns):
+    def write_course_to_csv_all_by_type(self, dir_address, typec,
+                                        hs_columns, gb_columns,
+                                        all_out=False,
+                                        all_typec=False,
+                                        id_use=False):
 
-        if not (typec in self.type_course):
+        if not all_typec or not (typec in self.type_course):
             raise Exception("UNKNOWN TYPE OF COURSE: ABORTING")
         else:
             # I need the first row only once
+            first_row, second_row = [], []
+            inner_gb_columns = gb_columns.copy()
+
+            if all_out:
+                inner_hs_columns = self.columns.copy()
+                for i in hs_columns:
+                    inner_hs_columns.remove(i)
+            else:
+                inner_hs_columns = hs_columns.copy()
             first_row, second_row = self.\
-                from_course_make_vector_couple(self.courses[0], hs_columns, gb_columns)
+                from_course_make_vector_couple(self.courses[0],
+                                               inner_hs_columns,
+                                               inner_gb_columns)
             rows = []
 
             counter = 0
@@ -523,7 +537,8 @@ class TurfConnect:
 
             for course in self.courses:
                 # test that the race is of the good type
-                if self.get_type_of_course_from_numcourse(course) == typec:
+                if self.get_type_of_course_from_numcourse(course) == typec \
+                        or all_typec:
                     instances += 1
 
                     this_date = self.get_date_of_course_from_numcourse(course)
@@ -533,7 +548,8 @@ class TurfConnect:
                         last_date = this_date
 
                     not_needed_row, row = self.\
-                    from_course_make_vector_couple(course, hs_columns, gb_columns)
+                    from_course_make_vector_couple(course, inner_hs_columns,
+                                                   inner_gb_columns)
                     rows.append(row)
                     print("-"*100)
                     remaining = length - counter
@@ -548,14 +564,22 @@ class TurfConnect:
                 dump_name = open(dir_address + "/" + "dump_counter", 'w')
                 dump_name.write(str(dump_counter+1))
                 dump_name.close()
-                dump_name = "dump-" + str(dump_counter)
+
+                dump_name = "dump-"
+                if all_out:
+                    dump_name += "all_out-"
+                if all_typec:
+                    dump_name += "all_typec-"
+                else:
+                    dump_name += ("typec-" + typec)
+                dump_name += (str(dump_counter) + "-")
 
 
                 ff = open(dir_address + "/" + dump_name + ".csv", 'w+',
                           encoding='utf-8')
 
                 # this is the descriptor file
-                fdescrip = open(dir_address + "/" + dump_name + "_descrp", 'w+',
+                fdescrip = open(dir_address + "/" + dump_name + "descrp", 'w+',
                                 encoding='utf-8')
 
                 first_date = str(first_date)
@@ -565,14 +589,16 @@ class TurfConnect:
                 fdescrip_str = (("- Number of horses by race: %d\n"
                                  "Instaces: %d\n"
                                  "Total attributes: %d\n"
-                                 "- First date: %s\n- Last date: %s\n"
+                                 "- First date: %s\n"
+                                 "- Last date: %s\n"
                                  "- Race type: %s\n"
                                  "- Attributes by horse: %d\n"
                                  "    - %s\n"
                                  "- Attributes by race: %d\n"
                                  "    - %s\n"
                                  "- File created: %s")
-                 % (self.normal, instances, len(first_row), last_date, typec,
+                 % (self.normal, instances, len(first_row), first_date,
+                    last_date, typec,
                     len(hs_columns),
                     str(hs_columns), len(gb_columns), str(gb_columns),
                     file_date)
@@ -583,11 +609,57 @@ class TurfConnect:
                 # csv-file write-to part
                 csv_writer = csv.writer(ff)
 
-                csv_writer.writerow(first_row)
+                # we need to add id to csv files
+                id = []
+                if id_use:
+                    id = ["id"]
+                    id.extend(first_row)
+                else:
+                    id.extend(first_row)
+
+                # csv_writer.writerow(first_row)
+                csv_writer.writerow(id)
+                id = 0
                 for row in rows:
-                    csv_writer.writerow(row)
+                    l = []
+                    if id_use:
+                        l = [id]
+                        l.extend(row)
+                    else:
+                        l.extend(row)
+
+                    csv_writer.writerow(l)
+
+                    id += 1
+                    # csv_writer.writerow(row)
             except Exception as e:
                 print("COULDN'T WRITE TO FILE : {}".format(e))
+
+    def update_to_latest_csv_file(self, dir_address, hs_columns,
+                                  gb_columns):
+        for typec in self.type_course:
+            self.write_course_to_csv_all_by_type(dir_address, typec,
+                                        hs_columns, gb_columns,
+                                        all_out=False,
+                                        all_typec=False,
+                                        id_use=True)
+        self.write_course_to_csv_all_by_type(dir_address, typec,
+                                        hs_columns, gb_columns,
+                                        all_out=False,
+                                        all_typec=True,
+                                        id_use=True)
+        self.write_course_to_csv_all_by_type(dir_address, typec,
+                                        hs_columns, gb_columns,
+                                        all_out=True,
+                                        all_typec=True,
+                                        id_use=True)
+
+
+
+
+
+
+
 
     # this function create bijection between a list of something and numbers
     # usually we will us it to map not numeric values to numeric ones

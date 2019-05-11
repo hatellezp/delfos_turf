@@ -26,4 +26,14 @@ gb_columns = ['jour', 'hippo', 'dist', 'partant']
 turf.write_course_to_csv(numcourse=ncourse, dir_address=daddres,
                          file_name=fname, hs_columns=hs_columns, gb_columns=gb_columns)
 
-turf.write_course_to_csv_all_by_type(dir_address=daddres, file_name=(fname+"02"), typec="Plat", hs_columns=hs_columns, gb_columns=gb_columns)
+turf.write_course_to_csv_all_by_type(dir_address=daddres, typec="Plat",
+                                     hs_columns=hs_columns,
+                                     gb_columns=gb_columns,
+                                     all_out=False,
+                                     id_use=False,
+                                     all_typec=False)
+
+
+turf.update_to_latest_csv_file(dir_address=daddres,
+                               hs_columns=hs_columns,
+                               gb_columns=gb_columns)

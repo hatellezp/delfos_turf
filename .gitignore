@@ -4,5 +4,5 @@
 # stupid file
 info_modificators.py
 
-__pycache
+#__pycache__
 venv
